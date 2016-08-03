@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+	<title>Simple Game Engine</title>
+	<style>
+      body {
+        margin: 0px;
+        padding: 0px;
+      }
+    </style>
+</head>
+<body>
+<canvas id="gamecanvas"></canvas>
+<script type="text/javascript" src="rAF.js"></script>
+<script type="text/javascript" src="core.js"></script>
+<script type="text/javascript" src="GameEnginee.js"></script>
+<script type="text/javascript">
+	
+     
+  //    console.log(input);
+	 // console.log(input.bindings);
+
+     // setInterval(function (){
+     // 	console.log(input.actions);
+     // 	console.log(input.mouse);
+     // },1000);
+     
+
+
+	(function (){
+
+		var canvas= null;
+		var context = null;
+		var entities = [];
+		var init = function(canvasId){
+			canvas = document.getElementById(canvasId);//document.createElement( 'canvas' );
+			canvas.width = 512;
+			canvas.height = 400;
+			context = canvas.getContext( '2d' );
+		}('gamecanvas');
+
+		var gameLoop = function(time){
+
+			for(var i=0; i < entities.length; i++){
+				entities[i].update(time);
+				if(entities[i].isDead){
+					entities.splice(i,1);
+				}
+			}
+
+			context.clearRect(0,0,canvas.width,canvas.height);
+			for(var i=0; i < entities.length; i++){
+				entities[i].draw();
+			}
+
+			requestAnimationFrame(gameLoop);
+		}
+
+		var input = function (){
+
+		  var actions= {};
+		  var bindings={};
+		  var mouse= { x:0, y:0, downAt: {x: 0,y: 0}, upAt: {x: 0, y: 0}};
+
+		  var bind = function (key, action){
+		  	console.log(key, action);
+		  	bindings[key] = action;
+		  }
+
+		  var onMouseMove = function(e){
+		  	mouse.x = e.clientX;
+		  	mouse.y = e.clientY;
+		  }
+
+		 var onMouseDown = function(e){
+		  	mouse.downAt.x = e.clientX;
+		  	mouse.downAt.y = e.clientY;
+		  }
+
+  		 var onMouseUp = function(e){
+		  	mouse.upAt.x = e.clientX;
+		  	mouse.upAt.y = e.clientY;
+
+		  	for (var i = 0; i < mouseUpCallbacks.length; i++) {
+		  		mouseUpCallbacks[i](e);
+		  	}
+		  }
+
+		  var onKeyDown = function(e){
+		  	
+		  	var action = bindings[e.keyCode];
+		  	if (action) {
+		  		actions[action] = true;
+		  	}
+		  }
+
+		  var onKeyUp = function(e){
+			
+		  	var action = bindings[e.keyCode];
+		  	if (action) {
+		  		actions[action] = false;
+		  	}
+
+		  }
+
+		  var mouseUpCallbacks = [];
+		  var mouseUp = function(callback){
+		  	mouseUpCallbacks.push(callback);
+		  }
+
+		  canvas.addEventListener('mousemove', onMouseMove);
+		  canvas.addEventListener('mouseup', onMouseUp);
+		  canvas.addEventListener('mousedown', onMouseDown);
+          document.body.addEventListener('keydown', onKeyDown);
+          document.body.addEventListener('keyup', onKeyUp);
+
+          return {
+          	bind: bind,
+			actions:actions,
+			bindings: bindings,
+			mouse: mouse,
+			onMouseUp: mouseUp
+          } 
+		}();
+
+        input.bind(87, 'move-up');
+        input.bind(65, 'move-left');
+        input.bind(83, 'move-down');
+        input.bind(68, 'move-right');
+
+		console.log(input.bindings);
+		console.log(input.actions);
+
+
+		var Entity = Class.extend({
+			pos: {
+				x: 0,
+				y:0
+			},
+
+			init: function(){},
+			update: function(){},
+			draw: function(){},
+
+		})
+
+		var Ball = Entity.extend({
+			init: function (){
+				this.velocityX = 5;
+				this.velocityY = 5;
+				this.pos.x = canvas.width /2;
+				this.pos.y = canvas.height /2;
+				this.moveTo = {x: 0, y:0};
+				this.easeIn = 10;
+				this.count = 10;
+				this.shadow = [];
+				this.isMouseClicked = false;
+				this.isDead = false;
+				
+			},
+			update: function(){
+				// if ((new Date()).getTime() %10 !== 0 )
+				// 	return
+				var self = this;
+				input.onMouseUp(function (){
+					self.isMouseClicked = true
+				});
+				
+				dx = this.pos.x -input.mouse.upAt.x;
+				dy = this.pos.y -input.mouse.upAt.y;
+				this.count +=1;
+
+				distance = Math.floor(Math.sqrt( (dx * dx + dy * dy) ));
+				this.shadow.push({x: this.pos.x, y: this.pos.y, life: 1});
+				if(this.isMouseClicked){
+					if(distance !== 0 && typeof distance != NaN){
+				//		this.shadow.push({x: this.pos.x, y: this.pos.y, life: 1});
+						this.pos.x -= (this.pos.x - input.mouse.upAt.x) / (this.easeIn % this.count);
+						this.pos.y -= (this.pos.y -input.mouse.upAt.y) / (this.easeIn % this.count);
+					}else{
+						this.count = this.easeIn;
+						this.isMouseClicked = false;
+					}
+				}
+				if (input.actions['move-up']) {
+					this.pos.y = this.pos.y - this.velocityY;
+				}
+				else if (input.actions['move-down']){
+					this.pos.y = this.pos.y + this.velocityY;
+				}
+
+				if (input.actions['move-left']) {
+					this.pos.x = this.pos.x - this.velocityX;
+				}
+				else if (input.actions['move-right']){
+					this.pos.x = this.pos.x + this.velocityX;
+				}
+				
+
+				if (this.shadow.length > 10) {
+					this.shadow.shift();
+				}
+				
+				if (this.shadow[0] && this.shadow[0].life-- < 0) {
+					this.shadow.shift();
+				}
+
+
+				if (this.pos.x > canvas.width) {
+				  this.velocityX = - this.velocityX;
+				}
+				else if (this.pos.x < 0) {
+					this.velocityX = - this.velocityX;	
+				}
+
+				if (this.pos.y > canvas.height) {
+				  this.velocityY = - this.velocityY;
+				}
+				else if (this.pos.y < 0) {
+					this.velocityY = - this.velocityY;	
+				}
+
+				// this.pos.x = this.pos.x + this.velocityX;
+				// this.pos.y = this.pos.y + this.velocityY;
+
+
+			},
+			draw: function(){
+				context.beginPath();
+				context.arc(this.pos.x, this.pos.y, 10, 0, Math.PI*2, true); 
+				context.closePath();
+				context.fill();
+
+				
+					var pos = this.shadow[0];
+					for(var i = 0; this.shadow.length > 0 && pos; i++){
+						context.beginPath();
+						context.arc(pos.x, pos.y, 10, 0, Math.PI*2, true); 
+						context.fillStyle="#FF0000";
+						context.closePath();
+						context.stroke();
+						pos = this.shadow[i];
+					}
+					
+				
+			},
+		});
+
+
+		var FPS = Entity.extend({
+			fps: 0,
+			lastTime: null,
+
+			update: function (t){
+				if (this.lastTime) {
+					this.fps = (t - this.lastTime  ) * 1000;
+				}
+
+
+				this.lastTime = t;
+			},
+
+			draw: function(){
+				context.fillText(this.fps,10,50);
+			}
+
+		});
+		entities.push(new FPS());
+		entities.push(new Ball());
+
+		
+		gameLoop();
+
+		// var ngin = {};
+
+		// ngin.Core = Class.extend({
+		// entities : [],
+		// inputs : [],
+		// canvas : null,
+		// context : null,
+		// init: function(canvasId) {
+		// 	console.log(canvasId)
+		// 	this.canvas = document.getElementById(canvasId);//document.createElement( 'canvas' );
+		// 	this.canvas.width = 512;
+		// 	this.canvas.height = 400;
+		// 	this.context = this.canvas.getContext( '2d' );
+		// },
+		// start: function(){
+		// 	this.gameLoop();
+		// 	return this;
+		// },
+		// addEntity: function(entity){
+		// 	this.entities.push(entity);
+		// 	return this;
+		// },
+
+		// gameLoop: function(argument) {
+		// 	var entities = ngin.Core.entities;
+		// 	var canvas = ngin.Core.canvas;
+		// 	var context = ngin.Core.context;
+
+			
+		// 	// update entities
+		// 	for (var i = 0 ; i < entities.length ; i++) {
+		// 		entities[i].update(argument);
+		// 	}
+		// 	// clear screen and draw entities
+		// 	context.clearRect(0,0,canvas.width,canvas.height);
+		// 	for (var i = 0 ; i < entities.length ; i++) {
+		// 		entities[i].draw(context);
+		// 	}
+		// 	// next game loop
+		// 	requestAnimationFrame(ngin.Core.gameLoop);
+		// }
+		// });
+
+		// var BaseEntity = Class.extend({
+		// 	pos : {
+		// 		x: 0,
+		// 		y: 0,
+		// 		z: 1
+		// 	},
+
+		// 	init: function(){
+
+		// 	},
+
+		// 	update: function(){
+
+		// 	},
+
+		// 	draw: function(){
+
+		// 	}
+		// });
+			
+		
+		// var Pad = BaseEntity.extend({
+		// velocityX: 1,
+		// velocityY: 1,
+		// update: function (arg){
+		// 	if (this.pos.x > game.canvas.width) {
+		// 	  this.velocityX = - this.velocityX;
+		// 	}
+		// 	else if (this.pos.x < 0) {
+		// 		this.velocityX = - this.velocityX;	
+		// 	}
+
+		// 	if (this.pos.y > game.canvas.height) {
+		// 	  this.velocityY = - this.velocityY;
+		// 	}
+		// 	else if (this.pos.y < 0) {
+		// 		this.velocityY = - this.velocityY;	
+		// 	}
+
+		// 	this.pos.x = this.pos.x + this.velocityX;
+		// 	this.pos.y = this.pos.y + this.velocityY;
+		// },
+		// draw: function (ctx){
+		// 	ctx.beginPath();
+		// 	ctx.moveTo(this.pos.x, this.pos.y);
+		// 	ctx.lineTo(this.pos.y + 80 , this.pos.x+ 80);
+		// 	ctx.stroke();
+		// }
+		// });
+
+		
+
+
+		// var game = new ngin.Core('gamecanvas');
+
+		// game.addEntity(new Pad());
+
+		// game.start();
+
+
+
+	}());
+</script>
+</body>
+</html>
