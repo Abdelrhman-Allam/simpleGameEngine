@@ -1,7 +1,7 @@
 var BaseEntity = Class.extend({
-    pos: {x:0,y:0},
-    size: {x:0,y:0},
-    hsize:{w:0, h:0},
+    pos: {x:0,y:0,z:0},
+    size: {x:0,y:0,z:0},
+    hsize:{w:0, h:0, z:0},
     zIndex:0,
     _killed: false,
     currentSpriteName:null,
